@@ -94,7 +94,7 @@ class Blip2OPT(Blip2Base):
 
         self.opt_proj = nn.Linear(
             self.Qformer.config.hidden_size, self.opt_model.config.hidden_size
-        )
+        ) # language model projection
 
         self.max_txt_len = max_txt_len
         self.prompt = prompt
@@ -104,13 +104,14 @@ class Blip2OPT(Blip2Base):
         self._apply_lemmatizer = apply_lemmatizer
         self._lemmatizer = None       
 
+    
     def forward(self, samples):
         image = samples["image"]
         with self.maybe_autocast():
             image_embeds = self.ln_vision(self.visual_encoder(image))
         image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(
             image.device
-        )
+        ) # first compute image embedding
 
         query_tokens = self.query_tokens.expand(image_embeds.shape[0], -1, -1)
         query_output = self.Qformer.bert(
@@ -118,16 +119,16 @@ class Blip2OPT(Blip2Base):
             encoder_hidden_states=image_embeds,
             encoder_attention_mask=image_atts,
             return_dict=True,
-        )
+        ) # compute learned query
 
-        inputs_opt = self.opt_proj(query_output.last_hidden_state)
-        atts_opt = torch.ones(inputs_opt.size()[:-1], dtype=torch.long).to(image.device)
+        inputs_opt = self.opt_proj(query_output.last_hidden_state) # encoded learned query embeddings
+        atts_opt = torch.ones(inputs_opt.size()[:-1], dtype=torch.long).to(image.device) # encode learned query embedding attention mask
 
         self.opt_tokenizer.padding_side = "right"
 
         text = [t + "\n" for t in samples["text_input"]]
 
-        opt_tokens = self.opt_tokenizer(
+        opt_tokens = self.opt_tokenizer( # tokenize text input
             text,
             return_tensors="pt",
             padding="longest",
@@ -135,7 +136,7 @@ class Blip2OPT(Blip2Base):
             max_length=self.max_txt_len,
         ).to(image.device)
 
-        targets = opt_tokens.input_ids.masked_fill(
+        targets = opt_tokens.input_ids.masked_fill( # tokenized text with att mask
             opt_tokens.input_ids == self.opt_tokenizer.pad_token_id, -100
         )
         if self.prompt:
@@ -146,7 +147,7 @@ class Blip2OPT(Blip2Base):
         )
         targets = torch.cat([empty_targets, targets], dim=1)
 
-        inputs_embeds = self.opt_model.model.decoder.embed_tokens(opt_tokens.input_ids)
+        inputs_embeds = self.opt_model.model.decoder.embed_tokens(opt_tokens.input_ids) # token embedding
         inputs_embeds = torch.cat([inputs_opt, inputs_embeds], dim=1)
         attention_mask = torch.cat([atts_opt, opt_tokens.attention_mask], dim=1)
 
