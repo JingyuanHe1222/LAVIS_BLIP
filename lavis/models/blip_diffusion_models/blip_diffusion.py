@@ -646,7 +646,7 @@ class BlipDiffusion(BaseModel):
 
         prompt = samples["prompt"]
         assert len(prompt) == 1, "Do not support multiple prompts for now"
-        prompt = self._build_prompts_edit(src_subject, tgt_subject, prompt[0])
+        prompt = self._build_prompts_edit(src_subject, tgt_subject, prompt[0]) # [src_prompt=src_sub+context, tgt_prompt=tgt_subject+context]
         print(prompt)
 
         controller = self._register_attention_refine(
@@ -658,15 +658,16 @@ class BlipDiffusion(BaseModel):
             threshold=lb_threshold,
         )
 
-        query_embeds = self.forward_ctx_embeddings(cond_image, cond_subject)
+        query_embeds = self.forward_ctx_embeddings(cond_image, cond_subject) # qformer.extract_features() -> multimodal embed - query tokens 
 
         tokenized_prompt_bef = self._tokenize_text(prompt[:1], with_query=False).to(
             self.device
-        )
+        ) # tokenize src_prompt
         tokenized_prompt_aft = self._tokenize_text(prompt[1:], with_query=True).to(
             self.device
-        )
+        ) # tokenize tgt_prompt
 
+        # embed src and cond prompts
         text_embeddings_bef = self.text_encoder(
             input_ids=tokenized_prompt_bef.input_ids,
         )[0]
@@ -678,7 +679,7 @@ class BlipDiffusion(BaseModel):
 
         text_embeddings = torch.cat([text_embeddings_bef, text_embeddings_aft], dim=0)
 
-        # 3. unconditional embedding
+        # 3. unconditional embedding -> for the negative prompts: ex. over-exposure
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # [TODO] add support for batched input
@@ -686,7 +687,7 @@ class BlipDiffusion(BaseModel):
 
         if do_classifier_free_guidance:
             max_length = self.text_encoder.text_model.config.max_position_embeddings
-
+       
             uncond_input = self.tokenizer(
                 [neg_prompt],
                 padding="max_length",
@@ -711,6 +712,7 @@ class BlipDiffusion(BaseModel):
             generator = torch.Generator(device=self.device)
             generator = generator.manual_seed(seed)
 
+        # make latents shape suitable for UNet
         latents = self._init_latent(latents, height, width, generator, batch_size)
 
         scheduler = self.pndm_scheduler if not use_inversion else self.ddim_scheduler
@@ -728,9 +730,17 @@ class BlipDiffusion(BaseModel):
                 width=width,
                 guidance_scale=guidance_scale,
                 use_inversion=use_inversion,
-            )
+            ) # predict noise and use ddim_sheduler to step to denoise x_t to x_{t-1}
 
-            latents = controller.step_callback(latents)
+            latents = controller.step_callback(latents) # AttentionControlEdit.localblend
+         
+            # when init controller: 
+                # 1. stack (mappers, alpha) = get_mapper(src_prompt, prompt[i]) for all prompts
+                # 2. get_mapper(x, y):  1) tokenize x and y; 2) score=(gap:0, match:1, mismatch:-1); 
+                #                         				3) align:
+           					#                         				    matrix = len(x)*len(y) fill with i*gap=0
+           					#                         				    trace_back = len(x)*len(y) fill with 0, [0, 0]=4m [0, *] = [*, 0] = 1
+
 
         image = self._latent_to_image(latents)
         controller.reset()
