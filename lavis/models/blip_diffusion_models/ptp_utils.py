@@ -172,8 +172,8 @@ class LocalBlend:
         self.max_num_words = 77
         
         alpha_layers = torch.zeros(len(prompts),  1, 1, 1, 1, self.max_num_words)
-        for i, (prompt, words_) in enumerate(zip(prompts, words)):
-            if type(words_) is str:
+        for i, (prompt, words_) in enumerate(zip(prompts, words)): # words = (src_subject, )
+            if type(words_) is str: # (src_prompt, src_subject) -> only pair
                 words_ = [words_]
             for word in words_:
                 ind = get_word_inds(prompt, word, tokenizer)
