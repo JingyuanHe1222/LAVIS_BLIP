@@ -25,6 +25,8 @@ from diffusers.models.cross_attention import CrossAttention
 from typing import Union, Tuple, List, Dict, Optional
 import torch.nn.functional as nnf
 
+import os, pickle
+
 
 def text_under_image(image: np.ndarray, text: str, text_color: Tuple[int, int, int] = (0, 0, 0)) -> np.ndarray:
     h, w, c = image.shape
@@ -165,6 +167,17 @@ class LocalBlend:
         mask = mask / mask.max(2, keepdims=True)[0].max(3, keepdims=True)[0]
         mask = mask.gt(self.threshold)
         mask = (mask[:1] + mask[1:]).float()
+        
+        if os.path.exists("~/LAVIS_BLIP/masks/mask_1"):       
+            with open("/home/ubuntu/LAVIS_BLIP/masks/mask_1", 'rb') as f:
+                masks = pickle.load(f)
+            masks.append(mask)
+        else: 
+            masks = [mask]
+
+        with open("/home/ubuntu/LAVIS_BLIP/masks/mask_1", 'wb') as f:
+            pickle.dump(mask, f)
+        
         x_t = x_t[:1] + mask * (x_t - x_t[:1])
         return x_t
        
