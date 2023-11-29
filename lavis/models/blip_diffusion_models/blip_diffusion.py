@@ -372,7 +372,45 @@ class BlipDiffusion(BaseModel):
         )
         image = tform(image).unsqueeze(0).to(self.device)
         return 2.0 * image - 1.0
+    
+    
+    @torch.no_grad()
+    def get_cond_mask(self, 
+        samples, 
+        sampleslb_threshold=0.3,
+        guidance_scale=7.5,
+        height=512,
+        width=512,
+        seed=42,
+        num_inference_steps=50,
+        num_inversion_steps=50,
+        neg_prompt="",
+    ):
+        
+        raw_image = self._inversion_transform(samples['cond_image'])
 
+        latents = self.get_image_latents(raw_image, rng_generator=None) # latent of the target iamge
+        
+        prompt = samples["prompt"]
+        assert len(prompt) == 1, "Do not support multiple prompts for now"
+        prompt = self._build_prompts_edit(src_subject, tgt_subject, prompt[0]) # [src_prompt=src_sub+context, tgt_prompt=tgt_subject+context]
+        print(prompt)
+        
+        controller = self._register_attention_refine( # attention store for target_object 
+            src_subject=cond_subject,
+            prompts=prompt,
+            num_inference_steps=num_inference_steps,
+            cross_replace_steps=cross_replace_steps,
+            self_replace_steps=self_replace_steps,
+            threshold=lb_threshold,
+        )
+        
+        
+#         controller.
+        
+
+    
+    
     @torch.no_grad()
     def edit(
         self,
@@ -386,7 +424,7 @@ class BlipDiffusion(BaseModel):
         num_inversion_steps=50,
         neg_prompt="",
     ):
-        raw_image = samples["raw_image"]
+        raw_image = samples["raw_image"] # that of the src_image
         raw_image = self._inversion_transform(raw_image)
 
         latents = self.get_image_latents(raw_image, rng_generator=None)

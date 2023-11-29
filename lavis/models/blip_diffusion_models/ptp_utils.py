@@ -168,6 +168,13 @@ class LocalBlend:
         mask = mask.gt(self.threshold)
         mask = (mask[:1] + mask[1:]).float()
         
+        # moprh transform
+        np_mask = mask.squeeze().cpu().numpy()
+        kernel = np.ones((3, 3),np.uint8)
+        dilated_mask = cv2.dilate(np_mask,kernel,iterations = 1)
+        mask = torch.from_numpy(dilated_mask)
+        mask = mask[None, None, :, :].to("cuda")
+        
         if os.path.exists("~/LAVIS_BLIP/masks/mask_1"):       
             with open("/home/ubuntu/LAVIS_BLIP/masks/mask_1", 'rb') as f:
                 masks = pickle.load(f)
@@ -176,10 +183,24 @@ class LocalBlend:
             masks = [mask]
 
         with open("/home/ubuntu/LAVIS_BLIP/masks/mask_1", 'wb') as f:
-            pickle.dump(mask, f)
+            pickle.dump(masks, f)
         
         x_t = x_t[:1] + mask * (x_t - x_t[:1])
         return x_t
+    
+    def __get_mask(self, attention_store):
+        k = 1
+        maps = attention_store["down_cross"][2:4] + attention_store["up_cross"][:3]
+        maps = [item.reshape(self.alpha_layers.shape[0], -1, 1, 16, 16, self.max_num_words) for item in maps]
+        maps = torch.cat(maps, dim=1)
+        maps = (maps * self.alpha_layers).sum(-1).mean(1)
+        mask = nnf.max_pool2d(maps, (k * 2 + 1, k * 2 +1), (1, 1), padding=(k, k))
+        mask = nnf.interpolate(mask, size=(x_t.shape[2:]))
+        mask = mask / mask.max(2, keepdims=True)[0].max(3, keepdims=True)[0]
+        mask = mask.gt(self.threshold)
+        mask = (mask[:1] + mask[1:]).float()
+        return mask
+        
        
     def __init__(self, prompts: List[str], words, tokenizer, device, threshold=.3, max_num_words=77):
         self.max_num_words = 77
