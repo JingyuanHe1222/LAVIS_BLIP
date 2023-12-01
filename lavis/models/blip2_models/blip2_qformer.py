@@ -21,6 +21,9 @@ from lavis.models.blip2_models.blip2 import (
 )
 from lavis.models.blip_models.blip_outputs import BlipOutput, BlipOutputFeatures
 
+### added for parallel issue for jupyter
+from lavis.common.dist_utils import get_rank
+
 
 @registry.register_model("blip2")
 @registry.register_model("blip2_feature_extractor")
@@ -150,7 +153,8 @@ class Blip2Qformer(Blip2Base):
         sim_t2i, _ = sim_t2q.max(-1)
         sim_t2i = sim_t2i / self.temp  # [batch_size, batch_size*num_gpu]
 
-        rank = dist.get_rank()
+#         rank = dist.get_rank()
+        rank = get_rank() ### parallel issue
         bs = image.size(0)
         targets = torch.linspace(rank * bs, rank * bs + bs - 1, bs, dtype=int).to(
             image.device
