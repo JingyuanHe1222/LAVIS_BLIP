@@ -151,9 +151,11 @@ class Mask():
 
             # back pass through gradients
             att_map = att_map * gradients
-            att_map = att_map[0].mean(0).cpu().detach()
+            att_map = att_map[0].mean(0).cpu().detach() 
 
+            
             mask = np.mean(att_map.cpu().detach().numpy(), axis=0)
+#             mask = gradcam[6].cpu().detach().numpy() # layer for token? 
 
             # produce binary mask
             mask[mask < np.mean(mask)] = 0
