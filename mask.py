@@ -21,6 +21,7 @@ import torch
 from PIL import Image
 import requests
 from lavis.models import load_model_and_preprocess, load_model
+import argparse
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -112,7 +113,7 @@ class Mask():
         image = self.vision_processer["eval"](raw_image).unsqueeze(0).to(device)
 
         # assemble inputs
-        pre_text = pre_caption(prompt)
+        pre_text = self.pre_caption(prompt)
         samples = {'image': image.to(device), 'text_input': pre_text}
 
         # only itc
@@ -138,7 +139,7 @@ class Mask():
             # for each token
             token_mask = text_tokens.attention_mask.view(text_tokens.attention_mask.size(0),1,-1,1,1)
 
-            print("mask shape: ", mask.size())
+            print("mask shape: ", token_mask.size())
 
             # text_encoder here is a pre-trained bert
             gradients=self.model.Qformer.base_model.base_model.encoder.layer[8].crossattention.self.get_attn_gradients()
@@ -160,7 +161,7 @@ class Mask():
 
             imgplot = plt.imshow(mask, cmap='gray')
             plt.axis('off')
-            imgplot.savefig(output_path, bbox_inches='tight', pad_inches=0)
+            plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
 
     
 
@@ -176,6 +177,6 @@ if __name__ == "__main__":
     
     
     mask_model = Mask()
-    mask_model(path_to_image, prompt, output_path)
+    mask_model.compute_mask(args.path_to_image, args.prompt, args.output_path)
     
     

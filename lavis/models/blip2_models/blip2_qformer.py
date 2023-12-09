@@ -145,9 +145,9 @@ class Blip2Qformer(Blip2Base):
         sim_i2t = sim_i2t / self.temp
         
         ###
-        print("sim_q2t size: ", sim_q2t.size())
-        print("sim_i2t: ", sim_i2t)
-        print("sim_i2t added dim: ", sim_i2t[None])
+#         print("sim_q2t size: ", sim_q2t.size())
+#         print("sim_i2t: ", sim_i2t)
+#         print("sim_i2t added dim: ", sim_i2t[None])
 
         # text-query similarity: [batch_size, batch_size*num_gpu, num_query_tokens]
         sim_t2q = torch.matmul(
@@ -158,9 +158,9 @@ class Blip2Qformer(Blip2Base):
         sim_t2i, _ = sim_t2q.max(-1)
         sim_t2i = sim_t2i / self.temp  # [batch_size, batch_size*num_gpu]
         
-        print("sim_t2q size: ", sim_t2q.size())
-        print("sim_t2i: ", sim_t2i)
-        print("sim_t2i added dim: ", sim_t2i[None])
+#         print("sim_t2q size: ", sim_t2q.size())
+#         print("sim_t2i: ", sim_t2i)
+#         print("sim_t2i added dim: ", sim_t2i[None])
 
 #         rank = dist.get_rank()
         rank = get_rank() ### parallel issue
@@ -169,9 +169,9 @@ class Blip2Qformer(Blip2Base):
             image.device
         )
         
-        print("targets:", targets) ###
-        print("targets type: ", targets.dtype)
-        print("converted targets type: ", targets.float().dtype)
+#         print("targets:", targets) ###
+#         print("targets type: ", targets.dtype)
+#         print("converted targets type: ", targets.float().dtype)
 
         if "image_id" in samples.keys(): #coco retrieval finetuning
             image_ids = samples["image_id"].view(-1,1)
@@ -189,7 +189,7 @@ class Blip2Qformer(Blip2Base):
                 + F.cross_entropy(sim_t2i[None], targets.float(), label_smoothing=0.1) ### CHANGE: add([None])
             ) / 2
 
-        print("loss_itc: ", loss_itc)
+#         print("loss_itc: ", loss_itc)
         
         ###============== Image-text Matching ===================###
         if bs == 1:
